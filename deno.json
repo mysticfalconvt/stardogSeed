@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "faker": "npm:faker@^6.6.6",
+    "stardog": "npm:stardog@^6.0.0"
+  }
+}
