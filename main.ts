@@ -1,40 +1,20 @@
-import { faker } from 'https://deno.land/x/deno_faker@v1.0.3/mod.ts';
 import stardog from 'npm:stardog';
+import {
+  accountPerPersonCount,
+  database,
+  modelUri,
+  orderPerAccountCount,
+  personClassCount,
+  personPerClassCount,
+  productPerOrderCount,
+} from './constants.ts';
 import { createDatabase } from './createDB.ts';
-
-const escapeDoubleQuotes = (text: string) => text.replace(/["\\]/g, '\\$&');
-const escapeString = (str: string) => {
-  return escapeDoubleQuotes(str.replace(/\s/g, '_').trim());
-};
 
 const conn = new stardog.Connection({
   username: 'admin',
   password: 'admin',
   endpoint: 'http://10.0.0.50:5820',
 });
-
-const getRandomPerson = () => {
-  return {
-    id: escapeString(faker.random.uuid()),
-    name: faker.name.findName(),
-    email: faker.internet.email(),
-    address: faker.address.streetAddress(),
-    city: faker.address.city(),
-    state: escapeString(faker.address.state()),
-    zipCode: faker.address.zipCode(),
-  };
-};
-
-// This includes all of the info for the seed
-const BASE_URI = 'tag:stardog:designer:seeded';
-const modelUri = `${BASE_URI}:model`;
-const dataUri = `${BASE_URI}:data`;
-const database = 'aSeededDatabase';
-const personClassCount = 50;
-const personPerClassCount = 300;
-const accountPerPersonCount = 3;
-const orderPerAccountCount = 100;
-const productPerOrderCount = 5;
 
 const generateModelAndAddToDb = async (personClassCount: number) => {
   console.log('generating model');
@@ -180,137 +160,62 @@ const generateModelAndAddToDb = async (personClassCount: number) => {
   console.log('model added', commit.body);
 };
 
-const addDataToDB = async (data: string) => {
-  const transaction = await stardog.db.transaction.begin(conn, database);
-  const transactionUUID = transaction.body;
+const createWorker = (workerData: {
+  classId: number;
+  personPerClassCount: number;
+  accountPerPersonCount: number;
+  orderPerAccountCount: number;
+  productPerOrderCount: number;
+}) => {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('./worker.ts', import.meta.url).href, {
+      type: 'module',
+      deno: { permissions: 'inherit' },
+    });
 
-  await stardog.db.add(
-    conn,
-    database,
-    transactionUUID,
-    data,
-    // @ts-ignore doesn't need encoding
-    {
-      contentType: 'text/turtle',
-    },
-    {
-      graphUri: dataUri,
-    },
-  );
-  const commit = await stardog.db.transaction.commit(
-    conn,
-    database,
-    transactionUUID,
-  );
-  return commit;
-};
-
-const generateAndAddData = async (
-  personIndex: number,
-  numberOfPeople: number,
-  numberOfAccountsPerPerson: number,
-  numberOfOrdersPerAccount: number,
-  numberOfProductsPerOrder: number,
-) => {
-  for (let i = 1; i <= numberOfPeople; i++) {
-    let data = '';
-    const person = getRandomPerson();
-
-    data += `
-        <${dataUri}:state_${person.state}> a <${modelUri}:State> ;
-          rdfs:label "${person.state}" .
-      `;
-
-    data += `
-        <${dataUri}:${person.id}> a <${modelUri}:Person_${personIndex}> ;
-          <${modelUri}:id_${personIndex}> "${person.id}" ;
-          <${modelUri}:name_${personIndex}> "${person.name}" ;
-          <${modelUri}:email_${personIndex}> "${person.email}" ;
-          <${modelUri}:street_address_${personIndex}> "${person.address}" ;
-          <${modelUri}:zip_code_${personIndex}> "${person.zipCode}" ;
-          <${modelUri}:From_State_${personIndex}> <${dataUri}:state_${person.state}> .
-      `;
-
-    for (let j = 1; j <= numberOfAccountsPerPerson; j++) {
-      const account = {
-        accountNumber: faker.random.uuid(),
-        accountType: faker.random.word(),
-      };
-
-      data += `
-          <${dataUri}:${account.accountNumber}> a <${modelUri}:Account> ;
-            <${modelUri}:account_number> "${account.accountNumber}" ;
-            <${modelUri}:account_type> "${account.accountType}" .
-  
-          <${dataUri}:${person.id}> <${modelUri}:Has_Account_${personIndex}> <${dataUri}:${account.accountNumber}> .
-        `;
-
-      for (let k = 1; k <= numberOfOrdersPerAccount; k++) {
-        const order = {
-          orderNumber: faker.random.uuid(),
-        };
-
-        data += `
-            <${dataUri}:${order.orderNumber}> a <${modelUri}:Purchase_Order> ;
-              <${modelUri}:order_number> "${order.orderNumber}" .
-  
-            <${dataUri}:${account.accountNumber}> <${modelUri}:Purchase_Account> <${dataUri}:${order.orderNumber}> .
-          `;
-
-        for (let l = 1; l <= numberOfProductsPerOrder; l++) {
-          const product = {
-            productID: faker.random.uuid(),
-            productName: faker.commerce.productName(),
-            productDescription: faker.commerce.product(),
-            productPrice: faker.commerce.price(),
-          };
-
-          data += `
-              <${dataUri}:${product.productID}> a <${modelUri}:Product> ;
-                <${modelUri}:product_ID> "${product.productID}" ;
-                <${modelUri}:Product_Name> "${product.productName}" ;
-                <${modelUri}:Product_Description> "${product.productDescription}" ;
-                <${modelUri}:Product_Price> "${product.productPrice}"^^xsd:float .
-  
-              <${dataUri}:${order.orderNumber}> <${modelUri}:Purchased_on_order> <${dataUri}:${product.productID}> .
-            `;
-        }
+    worker.onmessage = (e) => {
+      if (e.data.success) {
+        console.log(e.data.message);
+        resolve(e.data);
+      } else {
+        reject(new Error(`Worker ${e.data.classId} failed: ${e.data.error}`));
       }
-    }
+    };
 
-    await addDataToDB(data);
-    const percentageOfThisClass = i / numberOfPeople;
-    const percentagePerClass = 100 / personClassCount;
-    const totalPercentage =
-      (personIndex - 1) * percentagePerClass +
-      percentageOfThisClass * percentagePerClass;
+    worker.onerror = (error) => {
+      reject(new Error(`Worker ${workerData.classId} error: ${error.message}`));
+    };
 
-    console.log(
-      `Data generated for Person Class ${personIndex} of ${personClassCount} and personNumber ${i} of ${numberOfPeople} : ${totalPercentage.toFixed(
-        3,
-      )}%`,
-    );
-  }
+    worker.postMessage(workerData);
+  });
 };
 
 const main = async () => {
-  console.log('starting Seed');
+  console.log('Starting Seed');
   const result = await createDatabase(conn, database, modelUri);
   if (!result) {
     return;
   }
+
   await generateModelAndAddToDb(personClassCount);
-  for (let i = 1; i <= personClassCount; i++) {
-    await generateAndAddData(
-      i,
+
+  const workerPromises = Array.from({ length: personClassCount }, (_, i) => {
+    return createWorker({
+      classId: i + 1,
       personPerClassCount,
       accountPerPersonCount,
       orderPerAccountCount,
       productPerOrderCount,
-    );
-    console.log(`Data generated for Person Class ${i} of ${personClassCount}`);
+    });
+  });
+
+  try {
+    await Promise.all(workerPromises);
+    console.log('Seed completed');
+  } catch (error) {
+    console.error('Error during parallel processing:', error);
+    throw error;
   }
-  console.log('Seed completed');
 };
 
 main().catch(console.error);
