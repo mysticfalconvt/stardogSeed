@@ -1,10 +1,10 @@
-import { faker } from 'https://deno.land/x/deno_faker@v1.0.3/mod.ts';
-import stardog from 'npm:stardog';
-import { database, dataUri, modelUri } from './constants.ts';
+import { faker } from "https://deno.land/x/deno_faker@v1.0.3/mod.ts";
+import stardog from "npm:stardog";
+import { database, dataUri, modelUri } from "./constants.ts";
 
-const escapeDoubleQuotes = (text: string) => text.replace(/["\\]/g, '\\$&');
+const escapeDoubleQuotes = (text: string) => text.replace(/["\\]/g, "\\$&");
 const escapeString = (str: string) => {
-  return escapeDoubleQuotes(str.replace(/\s/g, '_').trim());
+  return escapeDoubleQuotes(str.replace(/\s/g, "_").trim());
 };
 
 const getRandomPerson = () => {
@@ -21,9 +21,9 @@ const getRandomPerson = () => {
 
 const addDataToDB = async (data: string) => {
   const conn = new stardog.Connection({
-    username: 'admin',
-    password: 'admin',
-    endpoint: 'http://10.0.0.50:5820',
+    username: "admin",
+    password: "admin",
+    endpoint: "http://10.0.0.50:5820",
   });
   const transaction = await stardog.db.transaction.begin(conn, database);
   const transactionUUID = transaction.body;
@@ -35,7 +35,7 @@ const addDataToDB = async (data: string) => {
     data,
     // @ts-ignore doesn't need encoding
     {
-      contentType: 'text/turtle',
+      contentType: "text/turtle",
     },
     {
       graphUri: dataUri,
@@ -56,7 +56,7 @@ const generatePersonData = (
   numberOfOrdersPerAccount: number,
   numberOfProductsPerOrder: number,
 ): string => {
-  let data = '';
+  let data = "";
 
   data += `
     <${dataUri}:state_${person.state}> a <${modelUri}:State> ;
@@ -129,9 +129,9 @@ export const generateAndAddData = async (
   numberOfAccountsPerPerson: number,
   numberOfOrdersPerAccount: number,
   numberOfProductsPerOrder: number,
-  chunkSize: number = 10,
+  chunkSize: number = 2,
 ) => {
-  let currentChunk = '';
+  let currentChunk = "";
   let peopleProcessed = 0;
 
   for (let i = 1; i <= numberOfPeople; i++) {
@@ -152,11 +152,13 @@ export const generateAndAddData = async (
 
       const percentageComplete = (i / numberOfPeople) * 100;
       console.log(
-        `Chunk committed for personClass ${personIndex}: processed ${i} of ${numberOfPeople} people (${percentageComplete.toFixed(
-          2,
-        )}%)`,
+        `Chunk committed for personClass ${personIndex}: processed ${i} of ${numberOfPeople} people (${
+          percentageComplete.toFixed(
+            2,
+          )
+        }%)`,
       );
-      currentChunk = '';
+      currentChunk = "";
     }
   }
 };

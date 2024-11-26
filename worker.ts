@@ -1,4 +1,4 @@
-import { generateAndAddData } from './generateAndAddData.ts';
+import { generateAndAddData } from "./generateAndAddData.ts";
 
 self.onmessage = async (e) => {
   const {

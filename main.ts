@@ -1,4 +1,4 @@
-import stardog from 'npm:stardog';
+import stardog from "npm:stardog";
 import {
   accountPerPersonCount,
   database,
@@ -7,17 +7,17 @@ import {
   personClassCount,
   personPerClassCount,
   productPerOrderCount,
-} from './constants.ts';
-import { createDatabase } from './createDB.ts';
+} from "./constants.ts";
+import { createDatabase } from "./createDB.ts";
 
 const conn = new stardog.Connection({
-  username: 'admin',
-  password: 'admin',
-  endpoint: 'http://10.0.0.50:5820',
+  username: "admin",
+  password: "admin",
+  endpoint: "http://10.0.0.50:5820",
 });
 
 const generateModelAndAddToDb = async (personClassCount: number) => {
-  console.log('generating model');
+  console.log("generating model");
   const prefixes = `
       @prefix : <http://api.stardog.com/> .
       @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -29,7 +29,7 @@ const generateModelAndAddToDb = async (personClassCount: number) => {
     `;
 
   const generatePersonClasses = () => {
-    let personClasses = '';
+    let personClasses = "";
     for (let i = 1; i <= personClassCount; i++) {
       personClasses += `
       <${modelUri}:Person_${i}> a owl:Class ;
@@ -145,7 +145,7 @@ const generateModelAndAddToDb = async (personClassCount: number) => {
     model,
     // @ts-ignore doesn't need encoding
     {
-      contentType: 'text/turtle',
+      contentType: "text/turtle",
     },
     {
       graphUri: modelUri,
@@ -157,7 +157,7 @@ const generateModelAndAddToDb = async (personClassCount: number) => {
     database,
     transactionUUID,
   );
-  console.log('model added', commit.body);
+  console.log("model added", commit.body);
 };
 
 const createWorker = (workerData: {
@@ -168,9 +168,9 @@ const createWorker = (workerData: {
   productPerOrderCount: number;
 }) => {
   return new Promise((resolve, reject) => {
-    const worker = new Worker(new URL('./worker.ts', import.meta.url).href, {
-      type: 'module',
-      deno: { permissions: 'inherit' },
+    const worker = new Worker(new URL("./worker.ts", import.meta.url).href, {
+      type: "module",
+      deno: { permissions: "inherit" },
     });
 
     worker.onmessage = (e) => {
@@ -191,7 +191,7 @@ const createWorker = (workerData: {
 };
 
 const main = async () => {
-  console.log('Starting Seed');
+  console.log("Starting Seed");
   const result = await createDatabase(conn, database, modelUri);
   if (!result) {
     return;
@@ -211,9 +211,9 @@ const main = async () => {
 
   try {
     await Promise.all(workerPromises);
-    console.log('Seed completed');
+    console.log("Seed completed");
   } catch (error) {
-    console.error('Error during parallel processing:', error);
+    console.error("Error during parallel processing:", error);
     throw error;
   }
 };
