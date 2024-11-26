@@ -6,4 +6,4 @@ export const personClassCount = 50;
 export const personPerClassCount = 300;
 export const accountPerPersonCount = 3;
 export const orderPerAccountCount = 100;
-export const productPerOrderCount = 5;
+export const productPerOrderCount = 100;
